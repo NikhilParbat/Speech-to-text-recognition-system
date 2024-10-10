@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech-to-Text</title>
+</head>
+<body>
+    <h1>Speech-to-Text Recognition</h1>
+    <p>Record your voice in Hindi or Marathi, and we will convert it to text.</p>
+
+    <!-- Audio controls -->
+    <button id="recordButton">Record</button>
+    <button id="stopButton" disabled>Stop</button>
+    <audio id="audioPlayback" controls></audio>
+
+    <!-- Text area to show recognized text -->
+    <h3>Recognized Text:</h3>
+    <textarea id="recognizedText" rows="10" cols="50"></textarea>
+
+    <script>
+        let chunks = [];
+        let recorder;
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const recognizedText = document.getElementById('recognizedText');
+
+        // Check if browser supports audio recording
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            console.log('getUserMedia supported.');
+
+            // Start recording
+            recordButton.onclick = () => {
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                    recorder = new MediaRecorder(stream);
+                    recorder.ondataavailable = e => chunks.push(e.data);
+
+                    recorder.onstop = () => {
+                        const blob = new Blob(chunks, { 'type': 'audio/wav; codecs=opus' });
+                        chunks = [];
+                        const audioURL = window.URL.createObjectURL(blob);
+                        audioPlayback.src = audioURL;
+
+                        // Send audio blob to the backend for processing
+                        const formData = new FormData();
+                        formData.append('audio', blob, 'recording.wav');
+
+                        // Post the audio to the backend server
+                        fetch('/upload-audio', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            // Display recognized text
+                            recognizedText.value = data.transcribed_text;
+                        })
+                        .catch(error => console.error('Error:', error));
+                    };
+
+                    recorder.start();
+                    recordButton.disabled = true;
+                    stopButton.disabled = false;
+                });
+            };
+
+            // Stop recording
+            stopButton.onclick = () => {
+                recorder.stop();
+                stopButton.disabled = true;
+                recordButton.disabled = false;
+            };
+        }
+    </script>
+</body>
+</html>
